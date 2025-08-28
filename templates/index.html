@@ -12,14 +12,6 @@
     <script>
         pdfjsLib.GlobalWorkerOptions.workerSrc = "https://cdnjs.cloudflare.com/ajax/libs/pdf.js/2.10.377/pdf.worker.min.js";
     </script>
-
-    <!-- script src="https://cloud.google.com/ai/gen-app-builder/client?hl=pt-BR"></script -->
-
-    <!-- Search widget element is not visible by default -->
-    <!-- gen-search-widget configId="3ed46650-16b3-4aa6-9234-1a2d737b3b1c" triggerId="searchWidgetTrigger" authToken="{{ jwt_token }}"-->
-    <!--gen-search-widget configId="d47b7c6b-e5b1-4b75-b4ee-99981b49cc31" triggerId="searchWidgetTrigger">
-    </gen-search-widget-->
-    <!--input type="hidden" id="jwt_token" name="jwt_token" value="{{ jwt_token }}"-->
 </head>
 
 <body>
@@ -27,14 +19,16 @@
         <b style="float: right; text-align: right;">{{ user_version_info }}</b>
         </br></br>
         <div class="form-box">
-            <button type="button" id="loadImageFileButton">Carregar Imagem/PDF</button>
+            <label for="nome_titular">Nome do Titular:</label>
+            <input type="text" id="nome_titular" name="nome_titular">
+            <label for="quantidade_dependentes">Quantidade de Dependentes:</label>
+            <input type="number" id="quantidade_dependentes" name="quantidade_dependentes" min="0" value="0">
             <button type="button" id="loadImageFolderButton">Carregar pasta</button>
-            <button type="button" id="processAllFilesButton">Lê todos</button>
-            <button type="button" id="processAllFilesOnceButton">Lê todos (1 chamada)</button>
+            <button type="button" id="validaDocumentosButton">Valida documentos</button>
             <!-- style="display: none;" -->
         </div>
         <div id="bulk-result-container" style="display: none; background-color: lightgray; padding: 10px; margin-top: 10px; border: 1px solid #ccc;">
-            <h3>Resultado da Leitura em Lote</h3>
+            <h3>Resultado da validação</h3>
             <pre id="bulk-api-result" style="white-space: pre-wrap; word-wrap: break-word; background-color: #fff; padding: 10px; border: 1px solid #ccc;"></pre>
         </div>
         <div id="image-container"></div>
@@ -50,13 +44,7 @@
         const fileInputElement = document.createElement('input');
         fileInputElement.type = 'file';
 
-        const loadImageFileButton = document.getElementById("loadImageFileButton");
         const loadImageFolderButton = document.getElementById("loadImageFolderButton");
-        const processAllFilesButton = document.getElementById("processAllFilesButton");
-        loadImageFileButton.addEventListener("click", function () {
-            fileInputElement.webkitdirectory = false;
-            fileInputElement.click();
-        });
 
         loadImageFolderButton.addEventListener("click", async function () {
             fileInputElement.webkitdirectory = true;
@@ -73,94 +61,14 @@
             }
         };
 
-        function getField(jsonString) {
-            try {
-                const data = JSON.parse(jsonString);
-                return data.list[0].guideType;
-            } catch (error) {
-                console.error("Erro ao analisar a string JSON:", error);
-            }
-            return "none";
-        }
-
-        async function processFile(file, fileDivElement, sendButton, deleteButton, apiResultElement, docLogElement, errorLogElement, repeatsElem, intervalElem) {
-            if (sendButton.textContent == "Pare") {
-                sendButton.style.backgroundColor = ""; // Reset color
-                sendButton.disabled = true;
-                return;
-            }
-            errorLogElement.textContent = "";
-            apiResultElement.textContent = "";
-            docLogElement.textContent = "";
-            const repeats = parseInt(repeatsElem.value, 10) || 1;
-            deleteButton.disabled = true;
-            repeatsElem.disabled = true;
-            processAllFilesButton.disabled = true;
-            loadImageFolderButton.disabled = true;
-            loadImageFileButton.disabled = true;
-            if (repeats == 1) sendButton.disabled = true;
-            else {
-                sendButton.textContent = "Pare";
-                sendButton.style.backgroundColor = "red";
-            }
-            let ilegiveis = 0
-            for (let i = 0; i < repeats; i++) {
-                console.log(`File: ${file.name}/${file.type}/${file.size}, Repeat: ${i + 1}/${repeats}`);
-                apiResultElement.textContent = `Processsando ${i + 1}/${repeats} por favor, espere.....`;
-                try {
-                    const formData = new FormData();
-                    formData.append(file.name, file);
-                    const result = await callApi(doc_read_api, formData);
-                    apiResultElement.textContent = `Resp.: ${i + 1}/${repeats}\n` + result;
-                    const guideType = getField(result);
-                    if (guideType != "sadt" && guideType != "outro") {
-                        ilegiveis++;
-                        docLogElement.textContent += `Repet.: ${i + 1}/${repeats}: ${guideType} - ilegiveis: ${ilegiveis}\n`;
-                    }
-                }
-                catch (error) {
-                    errorLogElement.textContent += `Repet.: ${i + 1}/${repeats}: ${error}\n`;
-                    apiResultElement.textContent = "";
-                }
-                var interval = (parseInt(intervalElem.value, 10) || 0) * 1000;
-                console.log(`File: ${file.name}, Repeat: ${i + 1}/${repeats} Interval: ${interval}s`);
-                if (i < repeats && !sendButton.disabled && interval > 0) {
-                    await new Promise(resolve => setTimeout(resolve, interval));
-                }
-                //apiResultElement.textContent = `${guideType}\nRepet.: ${i + 1}/${repeats}\n${apiResultElement.textContent}`;
-                if (sendButton.disabled) break;
-            }
-            deleteButton.disabled = false;
-            sendButton.textContent = "Lê guia";
-            sendButton.style.backgroundColor = ""; // Reset color
-            sendButton.disabled = false;
-            repeatsElem.disabled = false;
-            processAllFilesButton.disabled = false;
-            loadImageFolderButton.disabled = false;
-            loadImageFileButton.disabled = false;
-        }
-
         function loadFile(file) {
             const fileDivElement = createFileDivElement(file);
             fileDivElement.fileObject = file; // Store file object for bulk processing
             imageContainer.appendChild(fileDivElement);
             showImageFile(fileDivElement, file);
-            const apiResultElement = fileDivElement.querySelector('.api-result');
-            const errorLogElement = fileDivElement.querySelector('.error-log');
-            const docLogElement = fileDivElement.querySelector('.doc-log');
-            const errorDiv = fileDivElement.querySelector('.error-div');
-            const sendButton = fileDivElement.querySelector('.send-file-button');
             const deleteButton = fileDivElement.querySelector('.delete-element-button');
-            const repeatsElem = fileDivElement.querySelector('.repeats');
-            const intervalElem = fileDivElement.querySelector('.interval');
-            sendButton.addEventListener('click', () => processFile(
-                file, fileDivElement, sendButton, deleteButton, apiResultElement, docLogElement, errorLogElement, repeatsElem, intervalElem));
             deleteButton.addEventListener('click', () => {
                 fileDivElement.remove();
-            });
-            const showErrorCheckbox = fileDivElement.querySelector('.showErrorCheckbox');
-            showErrorCheckbox.addEventListener('change', () => {
-                errorDiv.style.display = showErrorCheckbox.checked ? 'block' : 'none';
             });
         }
 
@@ -173,25 +81,8 @@
             fileDivElement.innerHTML = `
                                 <div style="flex: 1; overflow-x: auto;">
                                     <h3>${filename}</h3>
-                                    <button type="button" class="send-file-button">Lê guia</button>
-                                    <label for="repeats-${filename}">Repetições:</label>
-                                    <input type="number" class="repeats" id="repeats-${filename}" value="1" min="1" style="width: 40px;">
-                                    <label for="interval-${filename}">Intervalo:</label>
-                                    <input type="number" class="interval" id="interval-${filename}" value="0" min="0" style="width: 40px;">
                                     <button type="button" class="delete-element-button">Deleta</button>
-                                    <input type="checkbox" class="showErrorCheckbox" checked>
-                                    <label for="showErrorCheckbox">Show Error Log</label></br>
                                     <img style="max-width: 100%; height: auto;" alt="${file.name}">
-                                </div>
-                                <div style="flex: 1; overflow-x: auto;">
-                                    <h3>API Result</h3>
-                                    <pre class="api-result" style="white-space: pre-wrap; word-wrap: break-word;"></pre>
-                                </div>
-                                <div class="error-div" style="flex: 1; overflow-x: auto;">
-                                    <h3>Log docs ilegiveis</h3>
-                                    <pre class="doc-log" style="white-space: pre-wrap; word-wrap: break-word;"></pre></br>
-                                    <h3>Log erros:</h3>
-                                    <pre class="error-log" style="white-space: pre-wrap; word-wrap: break-word;"></pre>
                                 </div>
                             `;
             return fileDivElement;
@@ -239,15 +130,8 @@
             }
         }
 
-        document.getElementById("processAllFilesButton").addEventListener("click", async function () {
-            const fileDivElements = document.querySelectorAll('.image-and-result-visualization');
-            for (const fileDivElement of fileDivElements) {
-                const sendButton = fileDivElement.querySelector('.send-file-button');
-                sendButton.click();
-            }
-        });
 
-        document.getElementById("processAllFilesOnceButton").addEventListener("click", async function () {
+        document.getElementById("validaDocumentosButton").addEventListener("click", async function () {
             const thisButton = this;
             const bulkResultContainer = document.getElementById('bulk-result-container');
             const bulkApiResult = document.getElementById('bulk-api-result');
@@ -259,6 +143,12 @@
             }
 
             const formData = new FormData();
+            const nomeTitular = document.getElementById('nome_titular').value;
+            const quantidadeDependentes = document.getElementById('quantidade_dependentes').value;
+
+            formData.append('nome_titular', nomeTitular);
+            formData.append('quantidade_dependentes', quantidadeDependentes);
+
             let fileCount = 0;
             for (const fileDivElement of fileDivElements) {
                 if (fileDivElement.fileObject) {
@@ -280,13 +170,13 @@
             bulkApiResult.textContent = `Enviando ${fileCount} arquivo(s) para a API...`;
 
             try {
-                const result = await callApi(doc_read_api, formData);
+                const result = await callApi(doc_read_api+"val-docs/", formData);
                 bulkApiResult.textContent = result;
             } catch (error) {
                 bulkApiResult.textContent = `Erro na chamada em lote: ${error}`;
             } finally {
                 thisButton.disabled = false;
-                thisButton.textContent = "Lê todos (1 chamada)";
+                thisButton.textContent = "Valida documentos";
             }
         });
 
