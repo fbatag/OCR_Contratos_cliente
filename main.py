@@ -5,9 +5,8 @@ from imageasylib.utils import getSaAcessToken, get_iap_user, getSignedUrlParam
 print("(RE)LOADING APPLICATION")
 TOKEN = os.environ.get("TOKEN", "TOKEN")
 print(f"TOKEN: {TOKEN}")
-#DOC_READ_API = os.environ.get("DOC_READ_API", "https://exameasy-484116905177.us-central1.run.app/")
-DOC_READ_API = os.environ.get("DOC_READ_API", "http://127.0.0.1:8080/")
-print(f"DOC_READ_API: {DOC_READ_API}")
+VAL_DOCS_API = os.environ.get("VAL_DOCS_API", "http://127.0.0.1:8080/")
+print(f"VAL_DOCS_API: {VAL_DOCS_API}")
 
 
 app = Flask(__name__)
@@ -19,15 +18,11 @@ def get_user_version_info():
 @app.route("/getAuthToken", methods=["GET"])
 def getSignedUrl():
     print("METHOD: getSignedUrl")
-
     return getSaAcessToken()
 
-
-@app.route("/", methods=["GET", "POST"])
+@app.route("/", methods=["GET"])
 def index():
     print("METHOD: index -> " + request.method)
-    #if request.method == "POST":
-    #    proceedWitForm()
     return renderIndex()
 
 def renderIndex(page="index.html"):
@@ -35,7 +30,7 @@ def renderIndex(page="index.html"):
     return render_template(page,
                            user_version_info=get_user_version_info(),
                            token=TOKEN,
-                           doc_read_api=DOC_READ_API)
+                           val_docs_api=VAL_DOCS_API)
 
 if __name__ == "__main__":
     app.run(port=5000, debug=True)

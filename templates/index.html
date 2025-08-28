@@ -18,25 +18,30 @@
     <form id="index_form" action="/" method="POST" enctype="multipart/form-data">
         <b style="float: right; text-align: right;">{{ user_version_info }}</b>
         </br></br>
-        <div class="form-box">
+        <div id="controlDiv" class="form-box">
+            <button type="button" id="loadImageFolderButton">Carregar pasta</button>
             <label for="nome_titular">Nome do Titular:</label>
             <input type="text" id="nome_titular" name="nome_titular">
             <label for="quantidade_dependentes">Quantidade de Dependentes:</label>
             <input type="number" id="quantidade_dependentes" name="quantidade_dependentes" min="0" value="0">
-            <button type="button" id="loadImageFolderButton">Carregar pasta</button>
-            <button type="button" id="validaDocumentosButton">Valida documentos</button>
-            <!-- style="display: none;" -->
         </div>
-        <div id="bulk-result-container" style="display: none; background-color: lightgray; padding: 10px; margin-top: 10px; border: 1px solid #ccc;">
-            <h3>Resultado da validação</h3>
-            <pre id="bulk-api-result" style="white-space: pre-wrap; word-wrap: break-word; background-color: #fff; padding: 10px; border: 1px solid #ccc;"></pre>
-        </div>
-        <div id="image-container"></div>
+    </form>
+    <button type="button" id="validaDocumentosButton">Valida documentos</button>
+    <button type="button" id="validaTitularButton">Valida titular</button>
+    <!-- style="display: none;" -->
+    </div>
+    <div id="bulk-result-container"
+        style="display: none; background-color: lightgray; padding: 10px; margin-top: 10px; border: 1px solid #ccc;">
+        <h3>Resultado da validação</h3>
+        <pre id="bulk-api-result"
+            style="white-space: pre-wrap; word-wrap: break-word; background-color: #fff; padding: 10px; border: 1px solid #ccc;"></pre>
+    </div>
+    <div id="image-container"></div>
     </form>
 
     <script>
         const token = "{{ token }}";
-        const doc_read_api = "{{ doc_read_api }}";
+        const val_docs_api = "{{ val_docs_api }}";
 
         //const form = document.querySelector("form");
 
@@ -44,7 +49,13 @@
         const fileInputElement = document.createElement('input');
         fileInputElement.type = 'file';
 
+        const controlDiv  = document.getElementById("controlDiv");
         const loadImageFolderButton = document.getElementById("loadImageFolderButton");
+        const validaDocumentosButton = document.getElementById("validaDocumentosButton");
+        const validaTitularButton = document.getElementById("validaTitularButton");
+
+        const bulkResultContainer = document.getElementById('bulk-result-container');
+        const bulkApiResult = document.getElementById('bulk-api-result');
 
         loadImageFolderButton.addEventListener("click", async function () {
             fileInputElement.webkitdirectory = true;
@@ -110,6 +121,50 @@
             }
         }
 
+
+        //validaDocumentosButton.addEventListener("click", () => callApi(val_docs_api + "val_docs/"));
+        validaDocumentosButton.addEventListener("click", () => sendFiles(val_docs_api));
+        validaTitularButton.addEventListener("click", () => sendFiles(val_docs_api + "val_tit/"));
+
+        async function sendFiles(api) {
+            const fileDivElements = document.querySelectorAll('.image-and-result-visualization');
+            if (fileDivElements.length === 0) {
+                alert("Nenhum arquivo para processar.");
+                return;
+            }
+            const formData = new FormData();
+            const nomeTitular = document.getElementById('nome_titular').value;
+            const quantidadeDependentes = document.getElementById('quantidade_dependentes').value;
+            formData.append('nome_titular', nomeTitular);
+            formData.append('quantidade_dependentes', quantidadeDependentes);
+            let fileCount = 0;
+            for (const fileDivElement of fileDivElements) {
+                if (fileDivElement.fileObject) {
+                    const file = fileDivElement.fileObject;
+                    console.log("filename" + file.name);
+                    formData.append(file.name, file);
+                    //formData.append("files", file); // Use a consistent field name for all files
+                    fileCount++;
+                }
+            }
+            if (fileCount === 0) {
+                alert("Nenhum arquivo encontrado nos elementos da página.");
+                return;
+            }
+            controlDiv.style.display = "none";
+            bulkResultContainer.style.display = 'block';
+            bulkApiResult.textContent = `Enviando ${fileCount} arquivo(s) para a API...`;
+
+            try {
+                const result = await callApi(api, formData);
+                bulkApiResult.textContent = result;
+            } catch (error) {
+                bulkApiResult.textContent = `Erro na chamada ${api}: ${error}`;
+            } finally {
+                controlDiv.style.display = "block";
+            }
+        }
+
         async function callApi(api, formData) {
             console.log(`Calling API ${api}`);
             const response = await fetch(api, {
@@ -130,61 +185,6 @@
             }
         }
 
-
-        document.getElementById("validaDocumentosButton").addEventListener("click", async function () {
-            const thisButton = this;
-            const bulkResultContainer = document.getElementById('bulk-result-container');
-            const bulkApiResult = document.getElementById('bulk-api-result');
-            const fileDivElements = document.querySelectorAll('.image-and-result-visualization');
-
-            if (fileDivElements.length === 0) {
-                alert("Nenhum arquivo para processar.");
-                return;
-            }
-
-            const formData = new FormData();
-            const nomeTitular = document.getElementById('nome_titular').value;
-            const quantidadeDependentes = document.getElementById('quantidade_dependentes').value;
-
-            formData.append('nome_titular', nomeTitular);
-            formData.append('quantidade_dependentes', quantidadeDependentes);
-
-            let fileCount = 0;
-            for (const fileDivElement of fileDivElements) {
-                if (fileDivElement.fileObject) {
-                    const file = fileDivElement.fileObject;
-                    formData.append(file.name, file);
-                    //formData.append("files", file); // Use a consistent field name for all files
-                    fileCount++;
-                }
-            }
-
-            if (fileCount === 0) {
-                alert("Nenhum arquivo encontrado nos elementos da página.");
-                return;
-            }
-
-            thisButton.disabled = true;
-            thisButton.textContent = "Processando...";
-            bulkResultContainer.style.display = 'block';
-            bulkApiResult.textContent = `Enviando ${fileCount} arquivo(s) para a API...`;
-
-            try {
-                const result = await callApi(doc_read_api+"val-docs/", formData);
-                bulkApiResult.textContent = result;
-            } catch (error) {
-                bulkApiResult.textContent = `Erro na chamada em lote: ${error}`;
-            } finally {
-                thisButton.disabled = false;
-                thisButton.textContent = "Valida documentos";
-            }
-        });
-
-        // Ask the authorization token for the application
-        // Set authorization token.
-        //const jwt_token = document.getElementById("jwt_token").value;
-        //const searchWidget = document.querySelector('gen-search-widget');
-        //searchWidget.authToken = jwt_token;    
     </script>
 </body>
 
