@@ -124,7 +124,7 @@
 
         //validaDocumentosButton.addEventListener("click", () => callApi(val_docs_api + "val_docs/"));
         validaDocumentosButton.addEventListener("click", () => sendFiles(val_docs_api));
-        validaTitularButton.addEventListener("click", () => sendFiles(val_docs_api + "val_tit/"));
+        validaTitularButton.addEventListener("click", () => sendFiles(val_docs_api + "val_tit"));
 
         async function sendFiles(api) {
             const fileDivElements = document.querySelectorAll('.image-and-result-visualization');
